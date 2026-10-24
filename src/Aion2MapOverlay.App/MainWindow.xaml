@@ -67,7 +67,7 @@
    </StackPanel>
   </Border>
   <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,18">
-   <Grid><Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="24"/><ColumnDefinition/></Grid.ColumnDefinitions>
+   <Grid><Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="24"/><ColumnDefinition/></Grid.ColumnDefinitions>
     <StackPanel><TextBlock Text="Icon size"/><Slider x:Name="IconSize" Minimum="10" Maximum="36" Value="20" TickFrequency="2" ValueChanged="Appearance_Changed"/></StackPanel>
     <StackPanel Grid.Column="2"><TextBlock Text="Opacity"/><Slider x:Name="IconOpacity" Minimum="0.25" Maximum="1" Value="0.9" ValueChanged="Appearance_Changed"/></StackPanel>
     <Grid Grid.Row="1" Grid.ColumnSpan="3" Margin="0,16,0,0">
@@ -82,7 +82,10 @@
       <ComboBoxItem Content="Default minimap"/><ComboBoxItem Content="Larger minimap"/>
      </ComboBox>
      <Button Content="Larger minimap setup…" Click="HudGuide_Click" Margin="0,7,0,0" Padding="8,5" FontSize="11"/>
+     <Button Content="Select minimap area…" Click="SelectMinimap_Click" Margin="0,7,0,0" Padding="8,6" FontSize="11" Background="#20516C" BorderBrush="#3289A2"/>
+     <Button Content="Reset to preset" Click="ResetMinimap_Click" Margin="0,7,0,0" Padding="8,5" FontSize="11"/>
      </StackPanel>
+     <TextBlock x:Name="MinimapRegionText" Grid.Row="2" Grid.ColumnSpan="3" Margin="0,10,0,0" Foreground="#84CBE5" TextWrapping="Wrap" FontSize="11" Text="Using preset area"/>
     </Grid>
    </Grid>
   </Border>

@@ -116,6 +116,8 @@ internal sealed class OverlayWindow : Window
                     dc.DrawEllipse(backdrop, null, point, size / 2 + 1, size / 2 + 1);
                     if (icons.TryGetValue(marker.Key, out var icon)) dc.DrawImage(icon, new Rect(point.X - size / 2, point.Y - size / 2, size, size));
                     else dc.DrawEllipse(Brushes.Cyan, null, point, size / 3, size / 3);
+                    if (marker.Id is not null && mini.TargetId == marker.Id)
+                        dc.DrawEllipse(null, new Pen(Brushes.Gold, 2), point, size / 2 + 3, size / 2 + 3);
                 }
                 dc.Pop(); dc.Pop();
             }

@@ -6,12 +6,13 @@ namespace Aion2MapOverlay.App;
 
 internal sealed record GuidanceFrame(double CenterX, double CenterY, double Radius, double Angle, string Name, string GroupKey, bool Large, DateTime CapturedAt);
 
-internal sealed record MinimapFrame(PlacedMarker[] Markers, double Left, double Top, double Width, double Height, bool Large, DateTime CapturedAt);
+internal sealed record MinimapFrame(PlacedMarker[] Markers, double Left, double Top, double Width, double Height, bool Large, DateTime CapturedAt, string? TargetId = null, IReadOnlySet<string>? ObservedIds = null);
 
 internal static class Navigation
 {
-    public static DisplayArea MinimapArea(DisplayArea display, bool large)
+    public static DisplayArea MinimapArea(DisplayArea display, bool large, MinimapRegion? custom = null)
     {
+        if (custom?.IsValid == true) return custom.ToDisplayArea(display);
         return new(display.X + (int)(display.Width * (large ? .859 : .868)),
             display.Y + (int)(display.Height * .089),
             (int)(display.Width * (large ? .130 : .122)),
@@ -38,6 +39,18 @@ internal static class Navigation
             Math.Atan2(Math.Sin(angle), Math.Cos(angle)),
             target.Name, target.GroupKey, large, capturedAt);
     }
+    // The minimap is north-up: point along the map bearing instead of estimating camera heading.
+    public static GuidanceFrame GuideOnMinimap(MapMarker target, MinimapFix fix, DisplayArea display,
+        DisplayArea area, bool large, DateTime capturedAt, bool visuallyObserved)
+    {
+        var bearing = Math.Atan2(target.ReferenceY - fix.PlayerY, target.ReferenceX - fix.PlayerX) + fix.Rotation;
+        var x = (area.X - display.X + area.Width / 2.0) / display.Width;
+        var y = (area.Y - display.Y + area.Height / 2.0) / display.Height;
+        var radius = Math.Min(area.Width, area.Height) * .20 / display.Width;
+        return new(x, y, radius, Math.Atan2(Math.Sin(bearing), Math.Cos(bearing)),
+            target.Name + (visuallyObserved ? " · icon seen" : " · possible spawn"), target.GroupKey, large, capturedAt);
+    }
+
     public static MinimapFrame ProjectMinimap(MarkerIndex index, HashSet<string> enabled, MinimapFix fix,
         DisplayArea display, DisplayArea area, bool large, DateTime capturedAt)
     {
@@ -64,11 +77,11 @@ internal sealed class NavigationSession(MarkerIndex index, DisplayArea display) 
     private DesktopCapture? capture;
     private MapMarker? target;
 
-    public (GuidanceFrame? Frame, MinimapFrame? Minimap, string Status) Process(bool large, HashSet<string> enabled, bool direction = true, bool showIcons = true)
+    public (GuidanceFrame? Frame, MinimapFrame? Minimap, string Status) Process(bool large, HashSet<string> enabled, bool direction = true, bool showIcons = true, MinimapRegion? region = null)
     {
         if (enabled.Count == 0) return (null, null, "Select a resource or collectible.");
         tracker ??= new MinimapTracker(Paths.Reference);
-        var area = Navigation.MinimapArea(display, large);
+        var area = Navigation.MinimapArea(display, large, region);
         if (capture?.Display != area)
         {
             capture?.Dispose(); capture = new DesktopCapture(area); target = null;
@@ -77,12 +90,11 @@ internal sealed class NavigationSession(MarkerIndex index, DisplayArea display) 
         using var gray = capture.GrabGray();
         var fix = tracker.Process(gray);
         if (fix is null) { target = null; return (null, null, "Minimap alignment lost. Check your minimap preset."); }
-        var minimap = showIcons ? Navigation.ProjectMinimap(index, enabled, fix, display, area, large, capturedAt) : null;
+        var projected = Navigation.ProjectMinimap(index, enabled, fix, display, area, large, capturedAt);
         target = direction ? Navigation.Nearest(index.Markers, enabled, fix, target) : null;
-        var heading = target is null ? null : CameraHeading.Detect(gray);
-        var guide = target is not null && heading is not null ? Navigation.Guide(target, fix, display, area, large, capturedAt, heading.Angle) : null;
-        return (guide, minimap, $"Minimap · {fix.Inliers} terrain points" +
-            (target is null ? "" : heading is null ? " · Direction hidden: camera cone not clear" : $" · Nearest: {target.Name} · camera-relative"));
+        var guide = target is not null ? Navigation.GuideOnMinimap(target, fix, display, area, large, capturedAt, false) : null;
+        return (guide, showIcons ? projected with { TargetId = target?.Id } : null, $"Minimap · {fix.Inliers} terrain points" +
+            (target is null ? "" : $" · Nearest mapped spawn: {target.Name}"));
     }
 
     public void Dispose()

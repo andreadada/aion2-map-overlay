@@ -12,6 +12,14 @@ internal static class SmokeCheck
     {
         Directory.CreateDirectory(output);
         CameraHeadingChecks.Run();
+        var monitor = new Aion2MapOverlay.Capture.DisplayArea(-1920, 120, 1920, 1080);
+        var selection = MinimapRegion.FromScreenRectangle(monitor, new System.Windows.Rect(-290, 245, 220, 175))
+            ?? throw new Exception("Guided minimap selection failed");
+        if (!selection.IsValid || selection.ToDisplayArea(monitor) != new Aion2MapOverlay.Capture.DisplayArea(-290, 245, 220, 175) ||
+            MinimapRegion.FromScreenRectangle(monitor, new System.Windows.Rect(-290, 245, 5, 5)) is not null)
+            throw new Exception("Minimap selection normalization or size validation failed");
+        if (Navigation.MinimapArea(monitor, true, selection) != selection.ToDisplayArea(monitor))
+            throw new Exception("Custom minimap was not used");
         var hudCode = HudGuide.Code;
         _ = Convert.FromBase64String(hudCode);
         if (!hudCode.EndsWith('=') || hudCode.Any(char.IsWhiteSpace) ||

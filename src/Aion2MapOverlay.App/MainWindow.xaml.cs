@@ -37,11 +37,12 @@ public partial class MainWindow : Window
     private ScreenshotHotkey? screenshotHotkey;
     private bool screenshotTransition;
     private DateTime lastStatus;
-    private sealed record SavedSettings(string[] Enabled, double Size, double Opacity, int Display, bool Navigation = false, int MinimapPreset = 1, bool AutomaticUpdates = true, bool MinimapIcons = true);
+    private sealed record SavedSettings(string[] Enabled, double Size, double Opacity, int Display, bool Navigation = false, int MinimapPreset = 1, bool AutomaticUpdates = true, bool MinimapIcons = true, MinimapRegion? CustomMinimap = null);
+    private MinimapRegion? customMinimap;
     private readonly CancellationTokenSource lifetime = new();
     private AvailableUpdate? availableUpdate;
     private bool checkingUpdates, setupBusy;
-    private sealed record NavigationOptions(bool Enabled, bool Large, bool Icons = true);
+    private sealed record NavigationOptions(bool Enabled, bool Large, bool Icons = true, MinimapRegion? Region = null);
     private NavigationOptions navigationOptions = new(false, true);
 
     public MainWindow()
@@ -78,6 +79,8 @@ public partial class MainWindow : Window
                 try { saved = JsonSerializer.Deserialize<SavedSettings>(File.ReadAllText(Paths.Settings)); }
                 catch (JsonException) { StatusText.Text = "Previous settings could not be read; using defaults."; }
             }
+            customMinimap = saved?.CustomMinimap?.IsValid == true ? saved.CustomMinimap : null;
+            RefreshMinimapRegionLabel();
             AutomaticUpdateToggle.IsChecked = saved?.AutomaticUpdates ?? true;
             UpdateText.Text = $"v{AppUpdates.CurrentVersion} · Updates via GitHub";
             if (!DataSetup.HasData)
@@ -107,7 +110,7 @@ public partial class MainWindow : Window
                 MinimapIconsToggle.IsChecked = saved.MinimapIcons;
                 MinimapPresetPicker.SelectedIndex = Math.Clamp(saved.MinimapPreset, 0, 1);
             }
-            Volatile.Write(ref navigationOptions, new(NavigationToggle.IsChecked == true, MinimapPresetPicker.SelectedIndex == 1, MinimapIconsToggle.IsChecked == true));
+            Volatile.Write(ref navigationOptions, new(NavigationToggle.IsChecked == true, MinimapPresetPicker.SelectedIndex == 1, MinimapIconsToggle.IsChecked == true, customMinimap));
             GroupsList.ItemsSource = groups; ready = true; SelectionChanged();
             StatusText.Text = $"{index.Markers.Count:N0} locations · {groups.Count} toggleable categories. Ready.";
             UpdateResourceUsage();
@@ -277,7 +280,7 @@ public partial class MainWindow : Window
                     if (!navigationSettings.Enabled && !navigationSettings.Icons) navigation.Dispose();
                     else if (aligned is null && !tracker.IsMapVisible(gray))
                     {
-                        (guidance, minimap, guidanceStatus) = navigation.Process(navigationSettings.Large, Volatile.Read(ref selected), navigationSettings.Enabled, navigationSettings.Icons);
+                        (guidance, minimap, guidanceStatus) = navigation.Process(navigationSettings.Large, Volatile.Read(ref selected), navigationSettings.Enabled, navigationSettings.Icons, navigationSettings.Region);
                     }
                     if (aligned is not null)
                     {
@@ -392,6 +395,47 @@ public partial class MainWindow : Window
         finally { ScreenshotModeButton.IsEnabled = true; }
     }
 
+
+    private void RefreshMinimapRegionLabel()
+    {
+        if (MinimapRegionText is null) return;
+        MinimapRegionText.Text = customMinimap is null
+            ? "Using preset area · Drag over the minimap to calibrate its position"
+            : $"Custom minimap · {customMinimap.Width:P1} × {customMinimap.Height:P1} of screen · saved";
+    }
+
+    private void SelectMinimap_Click(object sender, RoutedEventArgs e)
+    {
+        if (DisplayPicker.SelectedItem is not DisplayArea display) return;
+        // Hide both application windows so the underlying game is visible for the guided drag.
+        var wasOverlayVisible = overlay?.IsVisible == true;
+        if (wasOverlayVisible) overlay!.Hide();
+        Hide();
+        try
+        {
+            var picker = new ScreenRegionPicker(display,
+                "MINIMAP CALIBRATION\nDrag a rectangle around the visible minimap terrain. Keep the player centered; avoid surrounding HUD widgets.");
+            if (picker.ShowDialog() == true && picker.Selection is { } region)
+            {
+                customMinimap = region;
+                RefreshMinimapRegionLabel();
+                UpdateNavigationOptions();
+            }
+        }
+        finally
+        {
+            Show();
+            if (wasOverlayVisible) overlay?.Show();
+        }
+    }
+
+    private void ResetMinimap_Click(object sender, RoutedEventArgs e)
+    {
+        customMinimap = null;
+        RefreshMinimapRegionLabel();
+        UpdateNavigationOptions();
+    }
+
     private void HudGuide_Click(object sender, RoutedEventArgs e) => HudGuide.Show(this);
 
     private void Stop_Click(object sender, RoutedEventArgs e) { cancellation?.Cancel(); overlay?.Update(null, 20, 1); StatusText.Text = "Stopped."; }
@@ -401,7 +445,7 @@ public partial class MainWindow : Window
     private void UpdateNavigationOptions()
     {
         if (!ready) return;
-        Volatile.Write(ref navigationOptions, new(NavigationToggle.IsChecked == true, MinimapPresetPicker.SelectedIndex == 1, MinimapIconsToggle.IsChecked == true));
+        Volatile.Write(ref navigationOptions, new(NavigationToggle.IsChecked == true, MinimapPresetPicker.SelectedIndex == 1, MinimapIconsToggle.IsChecked == true, customMinimap));
         overlay?.ClearGuidance();
         saveTimer.Stop(); saveTimer.Start();
     }
@@ -448,7 +492,7 @@ public partial class MainWindow : Window
         try
         {
             var settings = new SavedSettings(groups.Where(g => g.Enabled).Select(g => g.Key).ToArray(), IconSize.Value, IconOpacity.Value, DisplayPicker.SelectedIndex,
-                NavigationToggle.IsChecked == true, MinimapPresetPicker.SelectedIndex, AutomaticUpdateToggle.IsChecked == true, MinimapIconsToggle.IsChecked == true);
+                NavigationToggle.IsChecked == true, MinimapPresetPicker.SelectedIndex, AutomaticUpdateToggle.IsChecked == true, MinimapIconsToggle.IsChecked == true, customMinimap);
             var temporary = Paths.Settings + ".tmp";
             File.WriteAllText(temporary, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
             File.Move(temporary, Paths.Settings, true);
