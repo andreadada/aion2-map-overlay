@@ -75,7 +75,7 @@
      <StackPanel VerticalAlignment="Center">
       <CheckBox x:Name="NavigationToggle" Content="Nearest resource direction" Foreground="#E7EDF5" Checked="Navigation_Changed" Unchecked="Navigation_Changed"/>
       <CheckBox x:Name="MinimapIconsToggle" Content="Resource icons on minimap" IsChecked="True" Foreground="#E7EDF5" Margin="0,8,0,0" Checked="Navigation_Changed" Unchecked="Navigation_Changed"/>
-      <TextBlock Text="Ring near your character · follows the minimap camera cone" FontSize="11" Foreground="#87A1BD" Margin="20,5,0,0"/>
+      <TextBlock Text="North-up direction on the selected minimap · mapped spawns only" FontSize="11" Foreground="#87A1BD" Margin="20,5,0,0"/>
      </StackPanel>
      <StackPanel Grid.Column="1">
      <ComboBox x:Name="MinimapPresetPicker" SelectedIndex="1" SelectionChanged="MinimapPreset_Changed" ToolTip="Choose the minimap layout used in Aion 2">
